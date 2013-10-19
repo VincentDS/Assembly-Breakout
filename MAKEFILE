@@ -1,0 +1,10 @@
+debug: EMPTY.ASM
+	ML /Zi /W3 /WX EMPTY.ASM /Fe EMPTY_D.EXE
+release: EMPTY.ASM
+	ML /W3 /WX EMPTY.ASM /Fe EMPTY.EXE
+clean:
+	del *.EXE
+	del *.OBJ
+	del *.BAK
+cv:
+	cv /s EMPTY_D.EXE
