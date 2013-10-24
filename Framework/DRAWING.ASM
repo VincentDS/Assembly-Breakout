@@ -131,7 +131,7 @@ updateScreen PROC NEAR
 	push	es
 	
 	; setup source and dest segments
-	mov		ax, seg screenBuffer
+	mov		ax, seg screenBuffer   ;verwijst naar .FARDATA? omdat hier screenbuffer inzit
 	mov		ds, ax
 	mov		si, offset screenBuffer
 	mov		ax, 0a000h	; video memory
