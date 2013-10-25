@@ -5,31 +5,14 @@
 .STACK 2048  ; stack, 2048 bytes
 .DATA        ; data segment, global variables
 
-	palette     db 20, 20, 20, 63, 63, 63 ; defines black (0,0,0) and white (63,63,63)
+	SCREENW		equ 320    ;screenwidth
+	SCREENH		equ 200		;screenheight
+	palette     db 0, 0, 0, 63, 63, 63 ; defines black (0,0,0) and white (63,63,63)
 	startaddr	dw	0a000h ;start of the video memory
 	
 
 .CODE        ; code segment
-
-drawFillRectangle PROC NEAR
 	
-	mov ax, startaddr
-	mov es, ax
-	mov bh, 40 ;x-coordinate
-	mov bl, 50 ;y-coordinate   ;omzetten naar 1 pixel= y-keer de breedte + x
-	
-	mov dx, 0  ;multiply requirement
-	mov al, bl ;y-coordinate in ax zetten
-	mov cx, 320 ;320 in register zetten, want mul accepteert geen naked value
-	mul cx   ; doet ax*320 en zet result in dx:ax
-	add al, bh ;tel er de x-coordinate bij op
-	mov di, ax ;zet het resultaat naar di
-	
-firsthorizontal:
-	mov cx,   ;set color to a register
-	mov es:[di], cx  ;set di register to color in cx
-
-drawFillRectangle ENDP
 ; ----------------------------- CODE STARTS HERE -------------------------------
 main:
 	
@@ -48,7 +31,38 @@ main:
 	mov ax, 1012h	; function 1012h of int 10h (set DAC palette)
 	int 10h		; call Video BIOS
 	
-	call drawFillRectangle
+	;blokje tekenen op 40x150 met lengte 30 en breedte 8
+	;segment en argumenten
+	mov ax, startaddr
+	mov es, ax
+	mov bh, 60 ;x-coordinate
+	mov bl, 180 ;y-coordinate   ;omzetten naar 1 pixel= y-keer de breedte + x
+	mov ch, 5
+	mov cl, 1 ;nu zit 1 in cx (kleur)
+
+beginposition:
+	mov	dx, SCREENW
+	mov al, bl ;y-coordinate in ax zetten
+	mul dx   ;doet ax*320 en zet result in dx:ax
+	add al, bh ;tel er de x-coordinate bij op
+	mov di, ax ;zet het resultaat naar di. Dit is de beginpositie
+	mov dx, di ;zet het resultaat ook in dx, zodat we de eindpositie kunnen berekenen van één lijn
+	add dx, 30 ;eindpositie van een lijn
+
+horizontal:
+	mov es:[di], cx  ;set di register to color in cx
+	inc di 
+	cmp di, dx
+	jnz horizontal
+
+nextline:
+	sub di, 30
+	add di, SCREENW
+	add dx, SCREENW
+	cmp ch, 0
+	dec ch
+	jnz horizontal
+
 	
 	; Exit to DOS
 	mov	ax, 4c00h

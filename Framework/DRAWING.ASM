@@ -15,8 +15,8 @@ include KEYB.INC
 ; --- MACROS AND CONSTANTS -----------------------------------------------------
 
 ; Other constants	
-SCREENW		equ 320
-SCREENH		equ 200
+SCREENW		equ 320    ;screenwidth
+SCREENH		equ 200		;screenheight
 
 ; --- DATA SEGMENT -------------------------------------------------------------
 .DATA        ; data segment, variables
@@ -268,7 +268,7 @@ drawRect PROC NEAR
 	mov	cx, [bp + 4][2]	; rect W
 	mov	al, 15	; color
 	cld
-	rep	stosb	; draw	
+	rep	stosb	; draw	;kopieert waarde van al in es:di, daarna wordt di incremented als de flag is cleared (cld)
 	
 	; Draw right vertical line	
 	mov		cx, [bp + 4][0]	; rect H
@@ -281,7 +281,7 @@ drawRect PROC NEAR
 	; Draw bottom horizontal line
 	mov	cx, [bp+4][2]	; rect W
 	std	; count backwards
-	rep	stosb	; draw
+	rep	stosb	; draw ;kopieert waarde van al in es:di, daarna wordt di decremented als de flag is set (std)
 	
 	; Draw left vertical line
 	mov	cx, [bp + 4][0]	; rect H
