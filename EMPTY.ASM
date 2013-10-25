@@ -7,7 +7,11 @@
 
 	SCREENW		equ 320    ;screenwidth
 	SCREENH		equ 200		;screenheight
-	palette     db 0, 0, 0, 63, 63, 63 ; defines black (0,0,0) and white (63,63,63)
+	
+	USERW		equ 35 
+	USERH		equ 5
+	
+	palette     db 0, 0, 0, 40, 40, 40  ; defines black (0,0,0) and white (63,63,63)
 	startaddr	dw	0a000h ;start of the video memory
 	
 
@@ -31,38 +35,51 @@ main:
 	mov ax, 1012h	; function 1012h of int 10h (set DAC palette)
 	int 10h		; call Video BIOS
 	
-	;blokje tekenen op 40x150 met lengte 30 en breedte 8
+fillRectangle: ;blokje tekenen op 40x150 met lengte 30 en breedte 5
+	;alle pushes
+	push es
+	push bx
+	push ax
+	push cx
+	push dx
+	push di
+	
 	;segment en argumenten
-	mov ax, startaddr
-	mov es, ax
-	mov bh, 60 ;x-coordinate
-	mov bl, 180 ;y-coordinate   ;omzetten naar 1 pixel= y-keer de breedte + x
-	mov ch, 5
+	mov es, startaddr
+	mov bx, 135 ;x-coordinate
+	mov al, 180 ;y-coordinate   ;omzetten naar 1 pixel= y-keer de breedte + x
+	mov ch, USERH ;lijncounter 
 	mov cl, 1 ;nu zit 1 in cx (kleur)
 
 beginposition:
 	mov	dx, SCREENW
-	mov al, bl ;y-coordinate in ax zetten
 	mul dx   ;doet ax*320 en zet result in dx:ax
-	add al, bh ;tel er de x-coordinate bij op
+	add ax, bx ;tel er de x-coordinate bij op
 	mov di, ax ;zet het resultaat naar di. Dit is de beginpositie
 	mov dx, di ;zet het resultaat ook in dx, zodat we de eindpositie kunnen berekenen van één lijn
-	add dx, 30 ;eindpositie van een lijn
+	add dx, USERW ;eindpositie van een lijn
 
 horizontal:
 	mov es:[di], cx  ;set di register to color in cx
-	inc di 
-	cmp di, dx
+	inc di ;di met een verhogen, zodat je één pixel verderzit
+	cmp di, dx ;kijken of je al aan de eindpositie van de lijn zit
 	jnz horizontal
 
 nextline:
-	sub di, 30
-	add di, SCREENW
-	add dx, SCREENW
-	cmp ch, 0
-	dec ch
+	sub di, USERW 
+	add di, SCREENW ;di terug op beginpositie zetten, maar een rij lager (+ SCREENW)
+	add dx, SCREENW ;eindpositie van de lijn ook een rij lager zetten
+	dec ch ;lijncounter één lager
+	cmp ch, 0 ;kijken of je alle lijnen al hebt getekent
 	jnz horizontal
 
+	;alle pops
+	pop di
+	pop dx
+	pop cx
+	pop ax
+	pop bx
+	pop es
 	
 	; Exit to DOS
 	mov	ax, 4c00h
