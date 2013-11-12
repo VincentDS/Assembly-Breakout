@@ -11,12 +11,17 @@
 	USERW		equ 35 
 	USERH		equ 5
 	
-	palette     db 0, 0, 0, 40, 40, 40  ; defines black (0,0,0) and white (63,63,63)
+	palette     db 0, 0, 0, 63, 63, 63  ; defines black (0,0,0) and white (63,63,63)
 	startaddr	dw	0a000h ;start of the video memory
 	
+	up	db "up$"
+	down db "down$"
+	left db "left$"
+	right db "right$"
 
 .CODE        ; code segment
-	
+
+
 ; ----------------------------- CODE STARTS HERE -------------------------------
 main:
 	
@@ -35,8 +40,7 @@ main:
 	mov ax, 1012h	; function 1012h of int 10h (set DAC palette)
 	int 10h		; call Video BIOS
 	
-fillRectangle: ;blokje tekenen op 40x150 met lengte 30 en breedte 5
-	;alle pushes
+		;alle pushes
 	push es
 	push bx
 	push ax
@@ -80,6 +84,43 @@ nextline:
 	pop ax
 	pop bx
 	pop es
+	
+readInput:	
+	mov ah, 00h 
+	int 16h 
+	cmp ah, 72
+	jz uparrow
+	cmp ah, 73
+	jz downarrow
+	cmp ah, 74
+	jz leftarrow
+	cmp ah, 75
+	jz rightarrow
+	
+uparrow:
+	mov ah, 09h 
+	mov	dx, offset up	
+	int 21h 
+	jmp readInput
+downarrow:
+	mov ah, 09h 
+	mov	dx, offset down	
+	int 21h 
+	jmp readInput
+leftarrow:
+	mov ah, 09h 
+	mov	dx, offset left	
+	int 21h 
+	jmp readInput
+rightarrow:
+	mov ah, 09h 
+	mov	dx, offset right	
+	int 21h 
+	jmp readInput
+
+
+	
+
 	
 	; Exit to DOS
 	mov	ax, 4c00h
