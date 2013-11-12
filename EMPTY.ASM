@@ -14,23 +14,25 @@
 	palette     db 0, 0, 0, 63, 63, 63  ; defines black (0,0,0) and white (63,63,63)
 	startaddr	dw	0a000h ;start of the video memory
 	
-	up	db "up$"
-	down db "down$"
-	left db "left$"
-	right db "right$"
-
+	;up = 72
+	;down = 80
+	;left = 75
+	;right = 77
+	;esc = 01
+	
+	
 .CODE        ; code segment
 
 
+	
 ; ----------------------------- CODE STARTS HERE -------------------------------
 main:
-	
+
 	; set the video mode 320x200, 256 colors
 	mov ah, 0  ; function 0 (set video mode)
 	mov al, 13h ; argument 13h (mode 13h to be set)
 	int 10h ; call Video BIOS
 	
-	; initialize the colorpallete
 	mov	ax, @data	; set data segment;
 	mov	ds, ax		;in ds
 	mov es, ax		; and in es
@@ -39,88 +41,64 @@ main:
 	mov cx, 2		; set color 0 and 1 (2 indexes in total) (2 kleuren)
 	mov ax, 1012h	; function 1012h of int 10h (set DAC palette)
 	int 10h		; call Video BIOS
+		
+
+Initialize:
+	mov	ax, 50 
+	push	ax  ;pushing width on the stack
+	mov ax, 135
+	push 	ax	;pushing x-position on the stack
+	mov ax,	190
+	push	ax	;pushing y-position on the stack
+	jmp DrawHorinzontalline
+
+
+	mov ah, 00h
+waitForInput:
+	xor	ax, ax  ;same as mov, ax 0 but faster (only 2 bytes instead of 3)
+	int	16h
+	cmp	al, 75	; test for left arrow key
+	jz goLeft
+	cmp	al, 77  ; test for right arrow key
+	jz goRight
+	jmp waitForInput
 	
-		;alle pushes
-	push es
-	push bx
-	push ax
-	push cx
-	push dx
-	push di
+goLeft:
+	blabla
+	jmp DrawHorizontalline
 	
-	;segment en argumenten
+goRight:
+	blabla
+	jmp DrawHorizontalline
+
+DrawHorizontalline:	
 	mov es, startaddr
-	mov bx, 135 ;x-coordinate
-	mov al, 180 ;y-coordinate   ;omzetten naar 1 pixel= y-keer de breedte + x
-	mov ch, USERH ;lijncounter 
-	mov cl, 1 ;nu zit 1 in cx (kleur)
+	push bp ; save old value of bp
+	mov bp, sp ; make bp our reference point
+	sub sp, 8   ; make room for 8 bytes of temporary space on stack. (for local variables)
 
-beginposition:
+	
+	;putting the arguments in constants
+	argWidth EQU [bp + 6]  
+	argPosX EQU [bp + 4]
+	argPosY EQU [bp + 2]
+	
+	;calculate offset of top-left corner
 	mov	dx, SCREENW
-	mul dx   ;doet ax*320 en zet result in dx:ax
-	add ax, bx ;tel er de x-coordinate bij op
-	mov di, ax ;zet het resultaat naar di. Dit is de beginpositie
-	mov dx, di ;zet het resultaat ook in dx, zodat we de eindpositie kunnen berekenen van één lijn
-	add dx, USERW ;eindpositie van een lijn
-
-horizontal:
-	mov es:[di], cx  ;set di register to color in cx
-	inc di ;di met een verhogen, zodat je één pixel verderzit
-	cmp di, dx ;kijken of je al aan de eindpositie van de lijn zit
-	jnz horizontal
-
-nextline:
-	sub di, USERW 
-	add di, SCREENW ;di terug op beginpositie zetten, maar een rij lager (+ SCREENW)
-	add dx, SCREENW ;eindpositie van de lijn ook een rij lager zetten
-	dec ch ;lijncounter één lager
-	cmp ch, 0 ;kijken of je alle lijnen al hebt getekent
-	jnz horizontal
-
-	;alle pops
-	pop di
-	pop dx
-	pop cx
-	pop ax
-	pop bx
-	pop es
+	mov ax, argPosY
+	mul	dx		;doet argPosY*SCREENW en zet result in dx:ax
+	add	ax, argPosX	;tel er de x-coordinate bij op
 	
-readInput:	
-	mov ah, 00h 
-	int 16h 
-	cmp ah, 72
-	jz uparrow
-	cmp ah, 73
-	jz downarrow
-	cmp ah, 74
-	jz leftarrow
-	cmp ah, 75
-	jz rightarrow
+	;drawing a line
+	mov	di, ax
+	mov	cx, argWidth	
+	mov	al, 1	
+	rep	stosb
 	
-uparrow:
-	mov ah, 09h 
-	mov	dx, offset up	
-	int 21h 
-	jmp readInput
-downarrow:
-	mov ah, 09h 
-	mov	dx, offset down	
-	int 21h 
-	jmp readInput
-leftarrow:
-	mov ah, 09h 
-	mov	dx, offset left	
-	int 21h 
-	jmp readInput
-rightarrow:
-	mov ah, 09h 
-	mov	dx, offset right	
-	int 21h 
-	jmp readInput
+	jmp	waitForInput
 
 
 	
-
 	
 	; Exit to DOS
 	mov	ax, 4c00h
