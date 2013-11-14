@@ -107,7 +107,7 @@ paletteInitFade PROC FAR
 	push	si
 	push	di
 	push	ds
-	push	es
+	push	Esc
 	
 	cld
 	
