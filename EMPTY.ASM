@@ -13,27 +13,29 @@ include KEYB.INC
 	SCREENW			equ 320		;screenwidth
 	SCREENH			equ 200		;screenheight
 	
-	PADDLEINITW		equ 35 
+	PADDLEINITW		equ 35
 	PADDLEINITH		equ 5
 	PADDLEINITPOSX	equ 135
 	PADDLEINITPOSY	equ 170
-	PADDLESPDINCX	equ 2
+	PADDLESPDINCX	equ 1
 	
 	BALLSIZE		equ 3
 	BALLINITPOSX	equ 160
 	BALLINITPOSY	equ 100
-	BALLSPDINCX		equ 2
-	BALLSPDINCY		equ	2	
+	BALLSPDINCX		equ 1
+	BALLSPDINCY		equ	1	
+	
 
 ; --- DATA SEGMENT -------------------------------------------------------------
 .DATA	; data segment, variables
 	
-	palette     	db	0, 0, 0, 63, 63, 63  ; defines black (0,0,0) and white (63,63,63)
+	palette     	db	0, 0, 0, 63, 63, 63, 2, 60, 20  ; defines black (0,0,0) and white (63,63,63)
 	startVideo		dw	0a000h 				;start of the video memory
 	paddle_pos		dw	PADDLEINITPOSX	
 	paddle_speed	dw	0	
 	ball_pos		dw	BALLINITPOSX, BALLINITPOSY
 	ball_speed		dw	BALLSPDINCX, BALLSPDINCY
+	brickarray1		dw	0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1
 	
 ; --- SCREEN BUFFER ------------------------------------------------------------
 .FARDATA?	; segment that contains the screenBuffer for mode 13h drawing
@@ -87,7 +89,7 @@ initializePalette PROC NEAR
 	mov 	es, ax				; and in es
 	mov 	dx, offset palette	; set the palette (DAC) (offset relative to es)
 	xor 	bx, bx				; set bx to zero (start at color index 0)
-	mov 	cx, 2				; set color 0 and 1 (2 indexes in total) (2 kleuren)
+	mov 	cx, 3				; set color 0 and 1 (2 indexes in total) (2 kleuren)
 	mov 	ax, 1012h			; function 1012h of int 10h (set DAC palette)
 	int 	10h					; call Video BIOS
 	
@@ -232,17 +234,18 @@ moveBall PROC NEAR
 	push	bx
 	push	cx
 
+	;x-future pos
 	mov		ax, [ball_pos][0]
 	mov		bx, [ball_speed][0]
-	add 	ax, bx
+	add 	ax, bx	
 left?:
 	cmp		ax, 0
-	jle leftfix ; future pos niet goed, custom pos wegschrijven
+	jle		leftfix ; future pos niet goed, custom pos wegschrijven
 right?:
 	mov		cx, SCREENW
 	sub		cx, BALLSIZE
 	cmp		ax, cx
-	jge rightfix ; future pos niet goed, custom pos wegschrijven
+	jge		rightfix ; future pos niet goed, custom pos wegschrijven
 	
 	mov		[ball_pos][0], ax ;geen fix nodig, future pos gewoon wegschrijven
 	jmp		cont
@@ -255,19 +258,20 @@ rightfix:
 	mov		[ball_pos][0], cx
 	neg		bx
 	mov		[ball_speed][0], bx
-	jmp		cont
+	jmp		cont 
+	;y-future pos
 cont:
 	mov		ax, [ball_pos][2]
 	mov		bx, [ball_speed][2]
 	add 	ax, bx
 top?:
 	cmp		ax, 0
-	jle topfix ; future pos niet goed, custom pos wegschrijven
+	jle		topfix ; future pos niet goed, custom pos wegschrijven
 bottom?:
 	mov		cx, SCREENH
 	sub		cx, BALLSIZE
 	cmp		ax, cx
-	jge bottomfix ; future pos niet goed, custom pos wegschrijven
+	jg		bottomfix ; future pos niet goed, custom pos wegschrijven
 	
 	mov		[ball_pos][2], ax ;geen fix nodig, future pos gewoon wegschrijven
 	jmp		next
@@ -281,8 +285,88 @@ bottomfix:
 	neg		bx
 	mov		[ball_speed][2], bx
 	jmp		next
-	
+
 next:
+;uppercollision:
+	;check collision for upper-edge
+	mov 	bx, [ball_pos][0]
+	mov		ax, BALLSIZE
+	xor		dx, dx
+	mov		cx, 2
+	div		cx
+	add		bx, ax
+	push 	bx	;pushing x-position on the stack
+	mov 	ax, [ball_pos][2]
+	push	ax	;pushing y-position on the stack
+	call	collision
+	cmp		dx, 0  ;geen collision
+	jz		lowercollision	
+	;collision, dus y-speed aanpassen
+	mov		bx, [ball_speed][2]
+	neg		bx
+	mov 	[ball_speed][2], bx
+
+lowercollision:
+	;check collision for lower-edge
+	mov 	bx, [ball_pos][0]
+	mov		ax, BALLSIZE
+	xor		dx, dx
+	mov		cx, 2
+	div		cx
+	add		bx, ax
+	push 	bx	;pushing x-position on the stack
+	mov 	ax, [ball_pos][2]
+	add		ax, BALLSIZE
+	push	ax	;pushing y-position on the stack
+	call	collision
+	cmp		dx, 0  ;geen collision
+	jz		leftcollision		
+	;collision, dus y-speed aanpassen
+	mov		bx, [ball_speed][2]
+	neg		bx
+	mov 	[ball_speed][2], bx
+
+
+leftcollision:
+	;check collision for lower-edge
+	mov 	ax, [ball_pos][0]
+	push 	ax	;pushing x-position on the stack
+	mov 	bx, [ball_pos][2]
+	mov		ax, BALLSIZE
+	xor		dx, dx
+	mov		cx, 2
+	div		cx
+	add		bx, ax
+	push	bx	;pushing y-position on the stack
+	call	collision
+	cmp		dx, 0  ;geen collision
+	jz		rightcollision		
+	;collision, dus y-speed aanpassen
+	mov		bx, [ball_speed][0]
+	neg		bx	
+	mov 	[ball_speed][0], bx
+	
+rightcollision:
+	;check collision for lower-edge
+	mov 	ax, [ball_pos][0]
+	add		ax, BALLSIZE
+	push 	ax	;pushing x-position on the stack
+	mov 	bx, [ball_pos][2]
+	mov		ax, BALLSIZE
+	xor		dx, dx
+	mov		cx, 2
+	div		cx
+	add		bx, ax
+	push	bx	;pushing y-position on the stack
+	call	collision
+	cmp		dx, 0  ;geen collision
+	jz		done		
+	;collision, dus y-speed aanpassen
+	mov		bx, [ball_speed][0]
+	neg		bx	
+	mov 	[ball_speed][0], bx 
+	
+done:
 	mov		ax, BALLSIZE 
 	push	ax  ;pushing width on the stack
 	mov		ax, BALLSIZE
@@ -298,6 +382,59 @@ next:
 	pop		ax
 	ret
 moveBall ENDP
+
+getColor PROC NEAR
+	Xpos	EQU [bp + 4][2]
+	Ypos 	EQU [bp + 4][0]
+
+	push 	bp ; save old value of bp
+	mov 	bp, sp ; make bp our reference point
+	
+	push	ax
+	push	es
+	
+	; set segment
+	mov		ax, seg screenBuffer
+	mov		es, ax
+	
+	;calculate offset of top-left corner
+	mov		dx, SCREENW
+	mov		ax, Ypos
+	mul		dx		;doet Ypos*SCREENW en zet result in dx:ax
+	add		ax, Xpos	;tel er de x-coordinate bij op
+	
+	mov		di, ax
+	mov		dx, es:[di]
+
+	pop 	es
+	pop		ax
+	pop		bp
+	ret		4
+getColor ENDP
+
+collision PROC NEAR
+	argX 	EQU [bp + 4][2]
+	argY 	EQU [bp + 4][0]
+	
+	push 	bp ; save old value of bp
+	mov 	bp, sp ; make bp our reference poin
+	
+	push	ax
+	
+	mov		ax, argX
+	push	ax	
+	mov		ax, argY
+	push	ax
+	call	getColor  ;dx geeft de kleur de meegegeven pixel terug
+	
+	cmp		dx, 0  ;als de pixel zwart is, is er geen collision false(0) teruggeven
+	jz		done
+	mov		dx, 1 ;de pixel is niet zwart, we hebben collision. we geven true(1) terug.
+done:
+	pop		ax
+	pop		bp
+	ret		4
+collision ENDP
 
 updateScreen PROC NEAR
 	push	ax
@@ -335,7 +472,6 @@ drawRectangle PROC NEAR
 	argHeight 	EQU [bp + 4][4]
 	argPosX 	EQU [bp + 4][2]
 	argPosY 	EQU [bp + 4][0]
-	retBytes 	EQU 8
 	
 	push 	bp ; save old value of bp
 	mov 	bp, sp ; make bp our reference point
@@ -374,7 +510,7 @@ heightLoop:
 	pop		dx
 
 	pop		bp
-	ret		retBytes
+	ret		8
 drawRectangle ENDP
 	
 ; _------------------------------- END OF CODE ---------------------------------
