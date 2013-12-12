@@ -13,29 +13,52 @@ include KEYB.INC
 	SCREENW			equ 320		;screenwidth
 	SCREENH			equ 200		;screenheight
 	
-	PADDLEINITW		equ 35
+	BLACK			equ 0
+	WHITE			equ 1
+	GREEN			equ 2
+	RED				equ	3
+	
+	PADDLEINITW		equ 40
 	PADDLEINITH		equ 5
-	PADDLEINITPOSX	equ 135
+	PADDLEINITPOSX	equ 140
 	PADDLEINITPOSY	equ 170
-	PADDLESPDINCX	equ 1
+	PADDLESPDINCX	equ 3
 	
 	BALLSIZE		equ 3
-	BALLINITPOSX	equ 160
-	BALLINITPOSY	equ 100
-	BALLSPDINCX		equ 1
-	BALLSPDINCY		equ	1	
+	BALLINITPOSX	equ 159
+	BALLINITPOSY	equ 165
+	BALLSPDINCX		equ 2
+	BALLSPDINCY		equ	2	
 	
+	GRIDOFFSETX		equ 15
+	GRIDOFFSETY		equ 15
+	GRIDWIDTH		equ 290
+	GRIDGAPX		equ 10
+	GRIDGAPY		equ 10
+	
+	BRICKWIDTH		equ 20
+	BRICKHEIGHT		equ 10
+	
+	LIFESIZE		equ	5
+	LIFEINITPOSX	equ 300
+	LIFEINITPOSY	equ	185 
+	LIFEGAP			equ 10
+	
+	ARRAYSIZE		equ 60 ;16*2 (dw) - 2
 
 ; --- DATA SEGMENT -------------------------------------------------------------
 .DATA	; data segment, variables
 	
-	palette     	db	0, 0, 0, 63, 63, 63, 2, 60, 20  ; defines black (0,0,0) and white (63,63,63)
+	palette     	db	0, 0, 0, 63, 63, 63, 20, 60, 20, 60, 20, 20  ; defines black (0,0,0) and white (63,63,63)
 	startVideo		dw	0a000h 				;start of the video memory
+	gamemode		dw	0
 	paddle_pos		dw	PADDLEINITPOSX	
 	paddle_speed	dw	0	
 	ball_pos		dw	BALLINITPOSX, BALLINITPOSY
 	ball_speed		dw	BALLSPDINCX, BALLSPDINCY
-	brickarray1		dw	0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1
+	brickarray		dw	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+	bricksperline	dw	0
+	lives			dw	3
 	
 ; --- SCREEN BUFFER ------------------------------------------------------------
 .FARDATA?	; segment that contains the screenBuffer for mode 13h drawing
@@ -59,8 +82,10 @@ main PROC NEAR
 	call 	updateScreen
 mainloop:
 	call	clearScreenBuffer
+	call 	drawGrid
 	call 	handleInput
 	call	moveBall
+	call	drawLives
 	call 	updateScreen
 	jmp 	mainloop	
 	
@@ -68,6 +93,15 @@ mainloop:
 	mov	ax, 4c00h
 	int	21h
 main ENDP
+
+endGame PROC NEAR
+	call	clearScreenBuffer
+	call	updateScreen
+	; Exit to DOS
+	mov		ax, 4c00h
+	int		21h
+	ret
+endGame ENDP
 
 initializeScreen PROC NEAR
 	; set the video mode 320x200, 256 colors
@@ -89,7 +123,7 @@ initializePalette PROC NEAR
 	mov 	es, ax				; and in es
 	mov 	dx, offset palette	; set the palette (DAC) (offset relative to es)
 	xor 	bx, bx				; set bx to zero (start at color index 0)
-	mov 	cx, 3				; set color 0 and 1 (2 indexes in total) (2 kleuren)
+	mov 	cx, 4				; set color 0 and 1 (2 indexes in total) (2 kleuren)
 	mov 	ax, 1012h			; function 1012h of int 10h (set DAC palette)
 	int 	10h					; call Video BIOS
 	
@@ -98,13 +132,18 @@ initializePalette PROC NEAR
 	pop 	bx
 	pop 	dx
 	pop 	ax
-	ret
+	ret	
 initializePalette ENDP
 	
 initializeEnvironment PROC NEAR
 	push	ax
-	
+
+drawBricks:
+	call 	drawGrid
+	call 	setBricks
 drawPaddle:
+	mov		ax, WHITE
+	push	ax
 	mov		ax, PADDLEINITW
 	push	ax  				;pushing width on the stack
 	mov		ax, PADDLEINITH
@@ -115,6 +154,8 @@ drawPaddle:
 	push	ax					;pushing y-position on the stack
 	call 	drawRectangle
 drawBall:	
+	mov		ax, WHITE
+	push	ax
 	mov		ax, BALLSIZE
 	push	ax  				;pushing width on the stack
 	mov		ax, BALLSIZE
@@ -150,6 +191,73 @@ clearScreenBuffer PROC NEAR
 	ret		0
 clearScreenBuffer ENDP
 
+drawGrid PROC NEAR
+	push	ax
+	push	bx
+	push	cx
+	push	dx
+	push	di
+	
+	mov		ax, GRIDOFFSETX
+	mov		bx, GRIDOFFSETY
+	mov		di, 0
+	mov		cx, ARRAYSIZE
+lp:
+	cmp		di, cx
+	jge		done
+	mov		dx, brickarray[di]
+	cmp		dx, 0
+	jz		updatevariables
+	mov		dx, GREEN
+	push	dx
+	mov		dx, BRICKWIDTH
+	push	dx  ;pushing width on the stack
+	mov		dx, BRICKHEIGHT
+	push	dx  ;pushing height on the stack
+	push 	ax	;pushing x-position on the stack
+	push	bx	;pushing y-position on the stack
+	call 	drawRectangle	
+updatevariables:
+	add		di, 2
+	add		ax, BRICKWIDTH
+	add		ax, GRIDGAPX
+	mov		dx,	GRIDWIDTH
+	add		dx, GRIDOFFSETX
+	add		ax, BRICKWIDTH 
+	cmp		ax, dx
+	jle		cont
+	mov		ax, GRIDOFFSETX
+	add		ax, BRICKWIDTH
+	add		bx, GRIDGAPY
+	add		bx, BRICKHEIGHT
+cont:
+	sub		ax, BRICKWIDTH
+	jmp 	lp	
+done:
+	pop		di
+	pop		dx
+	pop		cx
+	pop		bx
+	pop		ax
+	
+	ret
+drawGrid ENDP
+
+setBricks PROC NEAR
+	mov		ax, GRIDWIDTH
+	mov		bx,	BRICKWIDTH
+	add		bx, GRIDGAPX
+	xor		dx, dx
+	div		bx
+	mov		bx, BRICKWIDTH
+	cmp 	bx, dx
+	jg		done		
+	add		ax, 1
+done:
+	mov 	[bricksperline], ax
+	ret
+setBricks ENDP
+
 ; Reads keyboard buffer and acts (returns non-zero if loop should end, 0 otherwise)
 handleInput PROC NEAR
 	push	es
@@ -157,31 +265,57 @@ handleInput PROC NEAR
 	
 	mov 	[paddle_speed], 0
 	
-	mov	ax, seg __keysActive
-	mov	es, ax
+	mov		ax, seg __keysActive
+	mov		es, ax
 	
-	xor	ah, ah
-	mov	al, es:[__keysActive]
-	cmp	al, 0
-	jz	@done		; no key pressed
+	xor		ah, ah
+	mov		al, es:[__keysActive]
+	cmp		al, 0
+	jz		@done		; no key pressed
 
-	mov	al, es:[__keyboardState][SCANCODE_LEFT]	; test LEFT key
-	cmp	al, 0
-	jz @F	; jump next
+	mov		al, es:[__keyboardState][SCANCODE_LEFT]	; test LEFT key
+	cmp		al, 0
+	jz 		@F	; jump next
 	mov 	ax, [paddle_speed]
 	sub 	ax, PADDLESPDINCX
 	mov 	[paddle_speed], ax
+	mov		ax, [gamemode][0]
+	cmp		ax, 0
+	jnz		@F
+	mov		ax, [ball_pos][0]
+	sub 	ax, PADDLESPDINCX
+	mov		[ball_pos][0], ax
+	
 @@:
-	mov	al, es:[__keyboardState][SCANCODE_RIGHT]	; test RIGHT key
-	cmp	al, 0
-	jz @F	; jump next
+	mov		al, es:[__keyboardState][SCANCODE_RIGHT]	; test RIGHT key
+	cmp		al, 0
+	jz		@F	; jump next
 	mov 	ax, [paddle_speed]
 	add 	ax, PADDLESPDINCX
 	mov 	[paddle_speed], ax
-@@:
+	mov		ax, [gamemode][0]
+	cmp		ax, 0
+	jnz		@F
+	mov		ax, [ball_pos][0]
+	add 	ax, PADDLESPDINCX
+	mov		[ball_pos][0], ax
+
+@@:	
+	mov		al, es:[__keyboardState][SCANCODE_SPACE]	; test SPACE
+	cmp		al, 0
+	jz		@F	; jump next
+	mov		[gamemode], 1
 	
+@@:
 	; finally, let's put the ESC key status as return value in AX
-	mov	al, es:[__keyboardState][SCANCODE_ESC]	; test ESC
+	mov		al, es:[__keyboardState][SCANCODE_ESC]	; test ESC
+	cmp		al, 0
+	jz		@done	; jump next
+	call	clearScreenBuffer
+	call	updateScreen
+	; Exit to DOS
+	mov		ax, 4c00h
+	int		21h
 
 @done:
 	call	movePaddle
@@ -213,7 +347,9 @@ leftfix:
 rightfix:
 	mov		[paddle_pos], bx
 	jmp		next
-next:
+next:	
+	mov		ax, WHITE
+	push	ax
 	mov		ax, PADDLEINITW 
 	push	ax  ;pushing width on the stack
 	mov		ax, PADDLEINITH 
@@ -233,7 +369,12 @@ moveBall PROC NEAR
 	push	ax
 	push	bx
 	push	cx
-
+	
+	mov		ax, [gamemode][0]
+	cmp		ax, 0
+	jz		almostdone
+	
+	;boundarie collision
 	;x-future pos
 	mov		ax, [ball_pos][0]
 	mov		bx, [ball_speed][0]
@@ -269,6 +410,7 @@ top?:
 	jle		topfix ; future pos niet goed, custom pos wegschrijven
 bottom?:
 	mov		cx, SCREENH
+	sub		cx, 1
 	sub		cx, BALLSIZE
 	cmp		ax, cx
 	jg		bottomfix ; future pos niet goed, custom pos wegschrijven
@@ -280,11 +422,30 @@ topfix:
 	neg		bx
 	mov		[ball_speed][2], bx
 	jmp		next
+	
+almostdone:
+	jmp 	done
+	
 bottomfix:
-	mov		[ball_pos][2], cx
-	neg		bx
-	mov		[ball_speed][2], bx
+	;mov		[ball_pos][2], cx
+	;neg		bx
+	;mov		[ball_speed][2], bx
+	;jmp		next
+			
+	mov		ax, [lives]
+	sub		ax, 1
+	mov		[lives], ax
+	cmp		ax, 0
+	jz		einde
+	mov		[gamemode], 0
+	mov		[ball_pos][0], BALLINITPOSX
+	mov		[ball_pos][2], BALLINITPOSY
+	mov		[paddle_pos], PADDLEINITPOSX
 	jmp		next
+
+einde:
+	call 	endGame
+	
 
 next:
 ;uppercollision:
@@ -298,7 +459,7 @@ next:
 	push 	bx	;pushing x-position on the stack
 	mov 	ax, [ball_pos][2]
 	push	ax	;pushing y-position on the stack
-	call	collision
+	call	checkCollision
 	cmp		dx, 0  ;geen collision
 	jz		lowercollision	
 	;collision, dus y-speed aanpassen
@@ -318,14 +479,13 @@ lowercollision:
 	mov 	ax, [ball_pos][2]
 	add		ax, BALLSIZE
 	push	ax	;pushing y-position on the stack
-	call	collision
+	call	checkCollision
 	cmp		dx, 0  ;geen collision
 	jz		leftcollision		
 	;collision, dus y-speed aanpassen
 	mov		bx, [ball_speed][2]
 	neg		bx
 	mov 	[ball_speed][2], bx
-
 
 leftcollision:
 	;check collision for lower-edge
@@ -338,7 +498,7 @@ leftcollision:
 	div		cx
 	add		bx, ax
 	push	bx	;pushing y-position on the stack
-	call	collision
+	call	checkCollision
 	cmp		dx, 0  ;geen collision
 	jz		rightcollision		
 	;collision, dus y-speed aanpassen
@@ -358,7 +518,7 @@ rightcollision:
 	div		cx
 	add		bx, ax
 	push	bx	;pushing y-position on the stack
-	call	collision
+	call	checkCollision
 	cmp		dx, 0  ;geen collision
 	jz		done		
 	;collision, dus y-speed aanpassen
@@ -367,6 +527,8 @@ rightcollision:
 	mov 	[ball_speed][0], bx 
 	
 done:
+	mov		ax, WHITE
+	push	ax
 	mov		ax, BALLSIZE 
 	push	ax  ;pushing width on the stack
 	mov		ax, BALLSIZE
@@ -412,7 +574,7 @@ getColor PROC NEAR
 	ret		4
 getColor ENDP
 
-collision PROC NEAR
+checkCollision PROC NEAR
 	argX 	EQU [bp + 4][2]
 	argY 	EQU [bp + 4][0]
 	
@@ -430,11 +592,68 @@ collision PROC NEAR
 	cmp		dx, 0  ;als de pixel zwart is, is er geen collision false(0) teruggeven
 	jz		done
 	mov		dx, 1 ;de pixel is niet zwart, we hebben collision. we geven true(1) terug.
+	mov		ax, argX
+	push	ax
+	mov		ax, argY
+	push	ax
+	call	handleCollision
 done:
 	pop		ax
 	pop		bp
 	ret		4
-collision ENDP
+checkCollision ENDP
+
+handleCollision PROC NEAR
+	colX 	EQU [bp + 4][2]
+	colY 	EQU [bp + 4][0]
+	
+	push 	bp ; save old value of bp
+	mov 	bp, sp ; make bp our reference point
+		
+	push	ax
+	push	bx
+	push	cx
+	push	dx
+	push	di
+	
+	mov		ax, colY
+	mov		bx, PADDLEINITPOSY
+	sub		bx, BALLSIZE
+	sub		bx, 1
+	cmp		ax, bx
+	jge		done ;we hebben een collision met de paddle. er moet geen brick verwijderd worden.
+	
+	mov		ax, colY
+	sub		ax, GRIDOFFSETY
+	mov		bx, BRICKHEIGHT
+	add		bx, GRIDGAPY
+	xor		dx, dx
+	div		bx  ;div ax door bx, resultaat in ax
+	xor		dx, dx
+	mov		bx,	[bricksperline][0]
+	mul		bx   ;de lijn (ax) maal het aantal bricks per lijn = geeft het aantal bricks voor zijn huidige lijn terug
+	mov		cx, ax	;resultaat in cx zetten
+	
+	mov		ax, colX
+	sub		ax, GRIDOFFSETX
+	add		ax, 1 
+	mov		bx, BRICKWIDTH
+	add		bx, GRIDGAPX
+	xor		dx, dx
+	div		bx  ;div ax door bx, resultaat in ax
+	add		cx, ax
+	add		cx, cx
+	mov		di, cx
+	mov		[brickarray][di], BLACK
+done:
+	pop		di
+	pop		dx
+	pop		cx
+	pop		bx
+	pop		ax
+	pop		bp
+	ret		4
+handleCollision ENDP
 
 updateScreen PROC NEAR
 	push	ax
@@ -465,9 +684,41 @@ updateScreen PROC NEAR
 	pop		ax
 	ret		0
 updateScreen ENDP
+
+drawLives PROC NEAR
+	push	ax
+	push	bx
+	push	cx
+	
+	mov		cx, [lives]
+	mov		bx, LIFEINITPOSX
+lp:
+	cmp		cx, 0
+	jz		done
+	mov		ax, RED
+	push	ax
+	mov		ax, LIFESIZE 
+	push	ax  ;pushing width on the stack
+	mov		ax, LIFESIZE
+	push	ax  ;pushing height on the stack
+	push	bx
+	mov 	ax, LIFEINITPOSY
+	push	ax	;pushing y-position on the stack
+	call 	drawRectangle
+	sub		bx, LIFEGAP
+	sub		cx, 1
+	jmp 	lp
+	
+done:
+	pop 	cx
+	pop 	bx
+	pop		ax
+	ret
+drawLives ENDP
 	
 drawRectangle PROC NEAR
 	;putting the arguments in constants
+	argColor	EQU	[bp + 4][8]
 	argWidth 	EQU [bp + 4][6]
 	argHeight 	EQU [bp + 4][4]
 	argPosX 	EQU [bp + 4][2]
@@ -497,7 +748,7 @@ drawRectangle PROC NEAR
 heightLoop:
 	push	cx ;cx is used as counter in loop(height) & rep(width). pushing loop counter, so counter gets free for rep.
     mov		cx, argWidth      
-    mov		al, 1        
+    mov		al, argColor        
     rep		stosb  ;draws pixels until cx is zero
 	pop		cx
 	add 	di, SCREENW 
@@ -510,8 +761,9 @@ heightLoop:
 	pop		dx
 
 	pop		bp
-	ret		8
+	ret		10
 drawRectangle ENDP
+
 	
 ; _------------------------------- END OF CODE ---------------------------------
 END main

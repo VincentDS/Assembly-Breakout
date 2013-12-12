@@ -26,6 +26,7 @@ SCANCODE_UP	equ	48h
 SCANCODE_DOWN	equ	50h
 SCANCODE_LEFT	equ	4bh
 SCANCODE_RIGHT	equ	4dh
+SCANCODE_SPACE	equ 39h
 
 ; --- MACROS AND CONSTANTS -----------------------------------------------------
 
