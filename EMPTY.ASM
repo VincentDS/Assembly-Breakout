@@ -27,7 +27,7 @@ include KEYB.INC
 	BALLSIZE		equ 3
 	BALLINITPOSX	equ 159
 	BALLINITPOSY	equ 165
-	BALLSPDINCX		equ 2
+	BALLSPDINCX		equ 2 
 	BALLSPDINCY		equ	2	
 	
 	GRIDOFFSETX		equ 15
@@ -56,7 +56,7 @@ include KEYB.INC
 	paddle_speed	dw	0	
 	ball_pos		dw	BALLINITPOSX, BALLINITPOSY
 	ball_speed		dw	BALLSPDINCX, BALLSPDINCY
-	brickarray		dw	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+	brickarray		dw	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3
 	bricksperline	dw	0
 	lives			dw	3
 	
@@ -208,7 +208,7 @@ lp:
 	mov		dx, brickarray[di]
 	cmp		dx, 0
 	jz		updatevariables
-	mov		dx, GREEN
+	;mov		dx, GREEN
 	push	dx
 	mov		dx, BRICKWIDTH
 	push	dx  ;pushing width on the stack
@@ -466,6 +466,7 @@ next:
 	mov		bx, [ball_speed][2]
 	neg		bx
 	mov 	[ball_speed][2], bx
+	jmp 	fixvercollision
 
 lowercollision:
 	;check collision for lower-edge
@@ -486,6 +487,7 @@ lowercollision:
 	mov		bx, [ball_speed][2]
 	neg		bx
 	mov 	[ball_speed][2], bx
+	jmp 	fixvercollision
 
 leftcollision:
 	;check collision for lower-edge
@@ -505,6 +507,7 @@ leftcollision:
 	mov		bx, [ball_speed][0]
 	neg		bx	
 	mov 	[ball_speed][0], bx
+	jmp 	fixhorcollision
 	
 rightcollision:
 	;check collision for lower-edge
@@ -525,6 +528,50 @@ rightcollision:
 	mov		bx, [ball_speed][0]
 	neg		bx	
 	mov 	[ball_speed][0], bx 
+	jmp 	fixhorcollision
+	
+fixvercollision:
+	mov		ax, [ball_speed][2]
+	mov		bx, [ball_pos][2]
+	cmp		ax, 0
+	jl		vernegative
+verpositive:
+	add		bx, 1
+	mov		[ball_pos][2], bx
+	jmp 	verfinish
+vernegative:
+	sub		bx, 1
+	mov		[ball_pos][2], bx
+	
+verfinish:
+	mov 	ax, [ball_pos][0]
+	push 	ax
+	push 	bx
+	call 	checkCollision
+	cmp		dx, 0
+	jnz 	fixvercollision
+	jmp		done
+fixhorcollision:
+	mov		ax, [ball_speed][0]
+	mov		bx, [ball_pos][0]
+	cmp		ax, 0
+	jl		hornegative
+horpositive:
+	add		bx, 1
+	mov		[ball_pos][0], bx
+	jmp 	horfinish
+hornegative:
+	sub		bx, 1
+	mov		[ball_pos][0], bx
+	
+horfinish:
+	push 	bx
+	mov 	ax, [ball_pos][2]
+	push 	ax
+	call 	checkCollision
+	cmp		dx, 0
+	jnz 	fixhorcollision
+	jmp		done	
 	
 done:
 	mov		ax, WHITE
@@ -644,7 +691,14 @@ handleCollision PROC NEAR
 	add		cx, ax
 	add		cx, cx
 	mov		di, cx
-	mov		[brickarray][di], BLACK
+	mov		ax, [brickarray][di]
+	cmp		ax, 0
+	jz		removeblock
+	sub		ax, 1
+	mov		[brickarray][di], ax
+	jmp 	done
+removeblock:
+	mov		[brickarray][di], 0
 done:
 	pop		di
 	pop		dx
