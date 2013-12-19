@@ -25,9 +25,10 @@ include KEYB.INC
 	PADDLESPDINCX	equ 3
 	
 	BALLSIZE		equ 3
+	BALLHALFSIZE	equ 1
 	BALLINITPOSX	equ 159
 	BALLINITPOSY	equ 165
-	BALLSPDINCX		equ 2 
+	BALLSPDINCX		equ 2
 	BALLSPDINCY		equ	2	
 	
 	GRIDOFFSETX		equ 15
@@ -451,11 +452,7 @@ next:
 ;uppercollision:
 	;check collision for upper-edge
 	mov 	bx, [ball_pos][0]
-	mov		ax, BALLSIZE
-	xor		dx, dx
-	mov		cx, 2
-	div		cx
-	add		bx, ax
+	add		bx, BALLHALFSIZE
 	push 	bx	;pushing x-position on the stack
 	mov 	ax, [ball_pos][2]
 	push	ax	;pushing y-position on the stack
@@ -463,19 +460,28 @@ next:
 	cmp		dx, 0  ;geen collision
 	jz		lowercollision	
 	;collision, dus y-speed aanpassen
-	mov		bx, [ball_speed][2]
-	neg		bx
-	mov 	[ball_speed][2], bx
-	jmp 	fixvercollision
+	push	bx
+	push	ax
+	call	handleCollision
+	mov		dx, [ball_speed][2]
+	neg		dx
+	mov 	[ball_speed][2], dx	
+fixuppercollision:	
+	push 	bx
+	push 	ax
+	call 	checkCollision
+	cmp		dx, 0
+	jz	 	almostfixed
+	mov		cx, [ball_pos][2]
+	add		cx, 1
+	mov		[ball_pos][2], cx
+	add		ax, 1	
+	jmp 	fixuppercollision
 
 lowercollision:
 	;check collision for lower-edge
 	mov 	bx, [ball_pos][0]
-	mov		ax, BALLSIZE
-	xor		dx, dx
-	mov		cx, 2
-	div		cx
-	add		bx, ax
+	add		bx, BALLHALFSIZE
 	push 	bx	;pushing x-position on the stack
 	mov 	ax, [ball_pos][2]
 	add		ax, BALLSIZE
@@ -484,30 +490,55 @@ lowercollision:
 	cmp		dx, 0  ;geen collision
 	jz		leftcollision		
 	;collision, dus y-speed aanpassen
-	mov		bx, [ball_speed][2]
-	neg		bx
-	mov 	[ball_speed][2], bx
-	jmp 	fixvercollision
-
+	push	bx
+	push	ax
+	call	handleCollision
+	mov		dx, [ball_speed][2]
+	neg		dx
+	mov 	[ball_speed][2], dx
+fixlowercollision:	
+	push 	bx
+	push 	ax
+	call 	checkCollision
+	cmp		dx, 0
+	jz	 	almostfixed
+	mov		cx, [ball_pos][2]
+	sub		cx, 1
+	mov		[ball_pos][2], cx
+	sub		ax, 1	
+	jmp 	fixlowercollision
+	
+almostfixed:
+	jmp		done
+	
 leftcollision:
 	;check collision for lower-edge
 	mov 	ax, [ball_pos][0]
 	push 	ax	;pushing x-position on the stack
 	mov 	bx, [ball_pos][2]
-	mov		ax, BALLSIZE
-	xor		dx, dx
-	mov		cx, 2
-	div		cx
-	add		bx, ax
+	add		bx, BALLHALFSIZE
 	push	bx	;pushing y-position on the stack
 	call	checkCollision
 	cmp		dx, 0  ;geen collision
 	jz		rightcollision		
 	;collision, dus y-speed aanpassen
-	mov		bx, [ball_speed][0]
-	neg		bx	
-	mov 	[ball_speed][0], bx
-	jmp 	fixhorcollision
+	push	ax
+	push	bx
+	call	handleCollision
+	mov		dx, [ball_speed][0]
+	neg		dx	
+	mov 	[ball_speed][0], dx
+fixleftcollision:	
+	push 	bx
+	push 	ax
+	call 	checkCollision
+	cmp		dx, 0
+	jz	 	done
+	mov		cx, [ball_pos][0]
+	add		cx, 1
+	mov		[ball_pos][0], cx
+	add		ax, 1	
+	jmp 	fixleftcollision
 	
 rightcollision:
 	;check collision for lower-edge
@@ -515,63 +546,29 @@ rightcollision:
 	add		ax, BALLSIZE
 	push 	ax	;pushing x-position on the stack
 	mov 	bx, [ball_pos][2]
-	mov		ax, BALLSIZE
-	xor		dx, dx
-	mov		cx, 2
-	div		cx
-	add		bx, ax
+	add		bx, BALLHALFSIZE
 	push	bx	;pushing y-position on the stack
 	call	checkCollision
 	cmp		dx, 0  ;geen collision
 	jz		done		
 	;collision, dus y-speed aanpassen
-	mov		bx, [ball_speed][0]
-	neg		bx	
-	mov 	[ball_speed][0], bx 
-	jmp 	fixhorcollision
-	
-fixvercollision:
-	mov		ax, [ball_speed][2]
-	mov		bx, [ball_pos][2]
-	cmp		ax, 0
-	jl		vernegative
-verpositive:
-	add		bx, 1
-	mov		[ball_pos][2], bx
-	jmp 	verfinish
-vernegative:
-	sub		bx, 1
-	mov		[ball_pos][2], bx
-	
-verfinish:
-	mov 	ax, [ball_pos][0]
-	push 	ax
+	push	ax
+	push	bx
+	call	handleCollision
+	mov		dx, [ball_speed][0]
+	neg		dx	
+	mov 	[ball_speed][0], dx 
+fixrightcollision:	
 	push 	bx
-	call 	checkCollision
-	cmp		dx, 0
-	jnz 	fixvercollision
-	jmp		done
-fixhorcollision:
-	mov		ax, [ball_speed][0]
-	mov		bx, [ball_pos][0]
-	cmp		ax, 0
-	jl		hornegative
-horpositive:
-	add		bx, 1
-	mov		[ball_pos][0], bx
-	jmp 	horfinish
-hornegative:
-	sub		bx, 1
-	mov		[ball_pos][0], bx
-	
-horfinish:
-	push 	bx
-	mov 	ax, [ball_pos][2]
 	push 	ax
 	call 	checkCollision
 	cmp		dx, 0
-	jnz 	fixhorcollision
-	jmp		done	
+	jz	 	done
+	mov		cx, [ball_pos][0]
+	sub		cx, 1
+	mov		[ball_pos][0], cx
+	sub		ax, 1	
+	jmp 	fixrightcollision
 	
 done:
 	mov		ax, WHITE
@@ -639,14 +636,10 @@ checkCollision PROC NEAR
 	cmp		dx, 0  ;als de pixel zwart is, is er geen collision false(0) teruggeven
 	jz		done
 	mov		dx, 1 ;de pixel is niet zwart, we hebben collision. we geven true(1) terug.
-	mov		ax, argX
-	push	ax
-	mov		ax, argY
-	push	ax
-	call	handleCollision
 done:
 	pop		ax
 	pop		bp
+	
 	ret		4
 checkCollision ENDP
 
