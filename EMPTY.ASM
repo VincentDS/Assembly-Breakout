@@ -1,24 +1,23 @@
-; ==============================================================================
+;==============================================================================
 ; Empty example assembly file.
 ; ==============================================================================
 .MODEL large ; one data and one code segment, stack and data segment are grouped
 .STACK 2048  ; stack, 2048 bytes
-
 ; --- INCLUDES -----------------------------------------------------------------
-
 include KEYB.INC
-
 ; --- MACROS AND CONSTANTS -----------------------------------------------------
-
 	SCREENW			equ 320		;screenwidth
 	SCREENH			equ 200		;screenheight
 	
 	BLACK			equ 0
-	WHITE			equ 1
-	GREEN			equ 2
-	RED				equ	3
+	RED				equ 1
+	ORANGE			equ	2
+	YELLOW			equ 3
+	GREEN			equ 4
+	BLUE			equ 5
+	WHITE			equ 6
 	
-	PADDLEINITW		equ 40
+	PADDLEINITW		equ 40 
 	PADDLEINITH		equ 5
 	PADDLEINITPOSX	equ 140
 	PADDLEINITPOSY	equ 170
@@ -31,48 +30,50 @@ include KEYB.INC
 	BALLSPDINCX		equ 2
 	BALLSPDINCY		equ	2	
 	
-	GRIDOFFSETX		equ 15
-	GRIDOFFSETY		equ 15
-	GRIDWIDTH		equ 290
-	GRIDGAPX		equ 10
-	GRIDGAPY		equ 10
+	;We definiëren een grid waarin onze bricks getekend worden. Deze heeft een initiële X- en Y-positie en een breedte. 
+	;De hoogte van de grid hangt af van hoeveel bricks er getekend moeten worden. 
+	GRIDOFFSETX		equ 19    
+	GRIDOFFSETY		equ 19       
+	GRIDWIDTH		equ 282      
+	GRIDGAPX		equ 19 ;Het aantal pixels tussen 2 bricks (horizontaal)       
+	GRIDGAPY		equ 8 ;Het aantal pixels tussen 2 bricks (verticaal)
 	
-	BRICKWIDTH		equ 20
-	BRICKHEIGHT		equ 10
+	BRICKWIDTH		equ 24
+	BRICKHEIGHT		equ 5
 	
-	LIFESIZE		equ	5
+	LIFESIZE		equ	5 ;De grootte van het life-symbool
 	LIFEINITPOSX	equ 300
 	LIFEINITPOSY	equ	185 
-	LIFEGAP			equ 10
+	LIFEGAP			equ 10 ;Het aantal pixels tussen twee life-symbolen
 	
-	ARRAYSIZE		equ 60 ;16*2 (dw) - 2
-
+	ARRAYSIZE		equ 70 ;16*2 (dw) - 2
 ; --- DATA SEGMENT -------------------------------------------------------------
 .DATA	; data segment, variables
 	
-	palette     	db	0, 0, 0, 63, 63, 63, 20, 60, 20, 60, 20, 20  ; defines black (0,0,0) and white (63,63,63)
+	palette     	db	0, 0, 0, 60, 0, 0, 60, 30, 0, 60, 60, 0, 0, 60, 0, 0, 0, 60, 63, 63, 63  ; defines black (0,0,0) and white (63,63,63)
 	startVideo		dw	0a000h 				;start of the video memory
 	gamemode		dw	0
 	paddle_pos		dw	PADDLEINITPOSX	
 	paddle_speed	dw	0	
 	ball_pos		dw	BALLINITPOSX, BALLINITPOSY
 	ball_speed		dw	BALLSPDINCX, BALLSPDINCY
-	brickarray		dw	1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3, 3
+	brickarray		dw	5, 5, 5, 5, 5, 5, 5, 
+						4, 4, 4, 4, 4, 4, 4, 
+						3, 3, 3, 3, 3, 3, 3, 
+						2, 2, 2, 2, 2, 2, 2,
+						1, 1, 1, 1, 1, 1, 1
 	bricksperline	dw	0
 	lives			dw	3
 	
 ; --- SCREEN BUFFER ------------------------------------------------------------
 .FARDATA?	; segment that contains the screenBuffer for mode 13h drawing
-
 	screenBuffer	db	64000 dup(?)			; the 64000 bytes for the screen
 			
 ; ----------------------------- CODE STARTS HERE -------------------------------
 .CODE        ; code segment
-
 main PROC NEAR
 	mov	ax, @data	; set data segment;
 	mov	ds, ax		;in ds
-
 	; clear video buffer
 	call	installKeyboardHandler
 	call	clearScreenBuffer
@@ -94,7 +95,6 @@ mainloop:
 	mov	ax, 4c00h
 	int	21h
 main ENDP
-
 endGame PROC NEAR
 	call	clearScreenBuffer
 	call	updateScreen
@@ -103,7 +103,6 @@ endGame PROC NEAR
 	int		21h
 	ret
 endGame ENDP
-
 initializeScreen PROC NEAR
 	; set the video mode 320x200, 256 colors
 	mov ah, 0		; function 0 (set video mode)
@@ -124,7 +123,7 @@ initializePalette PROC NEAR
 	mov 	es, ax				; and in es
 	mov 	dx, offset palette	; set the palette (DAC) (offset relative to es)
 	xor 	bx, bx				; set bx to zero (start at color index 0)
-	mov 	cx, 4				; set color 0 and 1 (2 indexes in total) (2 kleuren)
+	mov 	cx, 7				; set color 0 and 1 (2 indexes in total) (2 kleuren)
 	mov 	ax, 1012h			; function 1012h of int 10h (set DAC palette)
 	int 	10h					; call Video BIOS
 	
@@ -367,7 +366,7 @@ next:
 movePaddle ENDP
 
 moveBall PROC NEAR
-	push	ax
+	push	dx
 	push	bx
 	push	cx
 	
@@ -454,28 +453,28 @@ next:
 	mov 	bx, [ball_pos][0]
 	add		bx, BALLHALFSIZE
 	push 	bx	;pushing x-position on the stack
-	mov 	ax, [ball_pos][2]
-	push	ax	;pushing y-position on the stack
+	mov 	dx, [ball_pos][2]
+	push	dx	;pushing y-position on the stack
 	call	checkCollision
-	cmp		dx, 0  ;geen collision
+	cmp		ax, 0  ;geen collision
 	jz		lowercollision	
 	;collision, dus y-speed aanpassen
 	push	bx
-	push	ax
+	push	dx
 	call	handleCollision
-	mov		dx, [ball_speed][2]
-	neg		dx
-	mov 	[ball_speed][2], dx	
+	mov		ax, [ball_speed][2]
+	neg		ax
+	mov 	[ball_speed][2], ax	
 fixuppercollision:	
 	push 	bx
-	push 	ax
+	push 	dx
 	call 	checkCollision
-	cmp		dx, 0
+	cmp		ax, 0
 	jz	 	almostfixed
 	mov		cx, [ball_pos][2]
 	add		cx, 1
 	mov		[ball_pos][2], cx
-	add		ax, 1	
+	add		dx, 1	
 	jmp 	fixuppercollision
 
 lowercollision:
@@ -483,29 +482,29 @@ lowercollision:
 	mov 	bx, [ball_pos][0]
 	add		bx, BALLHALFSIZE
 	push 	bx	;pushing x-position on the stack
-	mov 	ax, [ball_pos][2]
-	add		ax, BALLSIZE
-	push	ax	;pushing y-position on the stack
+	mov 	dx, [ball_pos][2]
+	add		dx, BALLSIZE
+	push	dx	;pushing y-position on the stack
 	call	checkCollision
-	cmp		dx, 0  ;geen collision
+	cmp		ax, 0  ;geen collision
 	jz		leftcollision		
 	;collision, dus y-speed aanpassen
 	push	bx
-	push	ax
+	push	dx
 	call	handleCollision
-	mov		dx, [ball_speed][2]
-	neg		dx
-	mov 	[ball_speed][2], dx
+	mov		ax, [ball_speed][2]
+	neg		ax
+	mov 	[ball_speed][2], ax
 fixlowercollision:	
 	push 	bx
-	push 	ax
+	push 	dx
 	call 	checkCollision
-	cmp		dx, 0
+	cmp		ax, 0
 	jz	 	almostfixed
 	mov		cx, [ball_pos][2]
 	sub		cx, 1
 	mov		[ball_pos][2], cx
-	sub		ax, 1	
+	sub		dx, 1	
 	jmp 	fixlowercollision
 	
 almostfixed:
@@ -513,61 +512,61 @@ almostfixed:
 	
 leftcollision:
 	;check collision for lower-edge
-	mov 	ax, [ball_pos][0]
-	push 	ax	;pushing x-position on the stack
+	mov 	dx, [ball_pos][0]
+	push 	dx	;pushing x-position on the stack
 	mov 	bx, [ball_pos][2]
 	add		bx, BALLHALFSIZE
 	push	bx	;pushing y-position on the stack
 	call	checkCollision
-	cmp		dx, 0  ;geen collision
+	cmp		ax, 0  ;geen collision
 	jz		rightcollision		
 	;collision, dus y-speed aanpassen
-	push	ax
+	push	dx
 	push	bx
 	call	handleCollision
-	mov		dx, [ball_speed][0]
-	neg		dx	
-	mov 	[ball_speed][0], dx
+	mov		ax, [ball_speed][0]
+	neg		ax	
+	mov 	[ball_speed][0], ax
 fixleftcollision:	
 	push 	bx
-	push 	ax
+	push 	dx
 	call 	checkCollision
-	cmp		dx, 0
+	cmp		ax, 0
 	jz	 	done
 	mov		cx, [ball_pos][0]
 	add		cx, 1
 	mov		[ball_pos][0], cx
-	add		ax, 1	
+	add		dx, 1	
 	jmp 	fixleftcollision
 	
 rightcollision:
 	;check collision for lower-edge
-	mov 	ax, [ball_pos][0]
-	add		ax, BALLSIZE
-	push 	ax	;pushing x-position on the stack
+	mov 	dx, [ball_pos][0]
+	add		dx, BALLSIZE
+	push 	dx	;pushing x-position on the stack
 	mov 	bx, [ball_pos][2]
 	add		bx, BALLHALFSIZE
 	push	bx	;pushing y-position on the stack
 	call	checkCollision
-	cmp		dx, 0  ;geen collision
+	cmp		ax, 0  ;geen collision
 	jz		done		
 	;collision, dus y-speed aanpassen
-	push	ax
+	push	dx
 	push	bx
 	call	handleCollision
-	mov		dx, [ball_speed][0]
-	neg		dx	
-	mov 	[ball_speed][0], dx 
+	mov		ax, [ball_speed][0]
+	neg		ax	
+	mov 	[ball_speed][0], ax 
 fixrightcollision:	
 	push 	bx
-	push 	ax
+	push 	dx
 	call 	checkCollision
-	cmp		dx, 0
+	cmp		ax, 0
 	jz	 	done
 	mov		cx, [ball_pos][0]
 	sub		cx, 1
 	mov		[ball_pos][0], cx
-	sub		ax, 1	
+	sub		dx, 1	
 	jmp 	fixrightcollision
 	
 done:
@@ -585,7 +584,7 @@ done:
 	
 	pop		cx
 	pop		bx
-	pop		ax
+	pop		dx
 	ret
 moveBall ENDP
 
@@ -596,7 +595,7 @@ getColor PROC NEAR
 	push 	bp ; save old value of bp
 	mov 	bp, sp ; make bp our reference point
 	
-	push	ax
+	push	dx
 	push	es
 	
 	; set segment
@@ -611,9 +610,10 @@ getColor PROC NEAR
 	
 	mov		di, ax
 	mov		dx, es:[di]
+	mov		ax, dx
 
 	pop 	es
-	pop		ax
+	pop		dx
 	pop		bp
 	ret		4
 getColor ENDP
@@ -625,19 +625,16 @@ checkCollision PROC NEAR
 	push 	bp ; save old value of bp
 	mov 	bp, sp ; make bp our reference poin
 	
-	push	ax
-	
 	mov		ax, argX
 	push	ax	
 	mov		ax, argY
 	push	ax
 	call	getColor  ;dx geeft de kleur de meegegeven pixel terug
 	
-	cmp		dx, 0  ;als de pixel zwart is, is er geen collision false(0) teruggeven
+	cmp		ax, 0  ;als de pixel zwart is, is er geen collision false(0) teruggeven
 	jz		done
-	mov		dx, 1 ;de pixel is niet zwart, we hebben collision. we geven true(1) terug.
+	mov		ax, 1 ;de pixel is niet zwart, we hebben collision. we geven true(1) terug.
 done:
-	pop		ax
 	pop		bp
 	
 	ret		4
